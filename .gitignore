@@ -2,4 +2,7 @@
 # 此 .gitignore 文件已由 Microsoft(R) Visual Studio 自动创建。
 ################################################################################
 
-/.vs/SOASample/v15
+/.vs
+/ZooKeeperSample/bin
+/ZooKeeperSample/obj
+/ZooKeeperSample/Properties

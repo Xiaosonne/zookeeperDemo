@@ -71,7 +71,7 @@ namespace ZooKeeperSample
                  }
              });
             var stat = zk.Exists("/zookeeper/mylock", wwd); 
-            //此处太浪费资源
+            //此处太浪费资源 
             while (!getLock)
             {
                 try
