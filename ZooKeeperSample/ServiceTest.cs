@@ -165,10 +165,26 @@ namespace ZooKeeperSample
 
 
         }
-        /// <summary>
-        /// 初始化zooKeeper
-        /// </summary> 
-        /// <returns></returns>
+        public void ZookeeperMutex() {
+            WatcherWithDelegate wwd = null;
+            wwd = new WatcherWithDelegate(p => {
+                
+            });
+            zk = new ZooKeeper("127.0.0.1:2181", TimeSpan.FromMinutes(3), null);
+            string line = "";
+            ManualResetEvent mre = new ManualResetEvent(false);
+            Action act = (() =>
+            {
+                while (zk.State != States.CONNECTED)
+                {
+                    Console.WriteLine("Loading");
+                    Thread.Sleep(300);
+                }
+                mre.Set();
+            });
+            act.BeginInvoke(null, null);
+            mre.WaitOne();
+        }
 
     }
 }
