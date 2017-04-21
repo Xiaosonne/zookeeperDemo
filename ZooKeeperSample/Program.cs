@@ -11,22 +11,18 @@ namespace ZooKeeperSample
     {
         static void Main(string[] args)
         {
-
-            ManualResetEvent mre = new ManualResetEvent(false);
-            mre.Reset();
+             
             int i = 0;
-            while (i < 30)
+            while (i < 5)
             {
                 Action act = new Action(() =>
-                {
-                    mre.WaitOne();
+                { 
                     ServiceTest st = new ServiceTest();
-                    st.ZookeeperSimpleMutex();
+                    st.ZookeeperMutex();
                 });
                 i++;
                 act.BeginInvoke(null, null);
-            }
-            mre.Set();
+            } 
             while (Console.ReadLine() != "QUIT")
             {
                 continue;

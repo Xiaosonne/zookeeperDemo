@@ -47,7 +47,7 @@ namespace ZooKeeperSample
             mre.WaitOne();
             string id = Guid.NewGuid().ToString();
 
-            Console.WriteLine(id+" Connected");
+            Console.WriteLine(id + " Connected");
             bool getLock = false;
             WatcherWithDelegate wwd = null;
             wwd = new WatcherWithDelegate(p =>
@@ -70,7 +70,7 @@ namespace ZooKeeperSample
                      }
                  }
              });
-            var stat = zk.Exists("/zookeeper/mylock", wwd); 
+            var stat = zk.Exists("/zookeeper/mylock", wwd);
             //此处太浪费资源 
             while (!getLock)
             {
@@ -84,7 +84,7 @@ namespace ZooKeeperSample
                 {
 
                 }
-            } 
+            }
             Console.WriteLine(id + " wait for input anything to shutdown");
             Thread.Sleep(300);
             Console.WriteLine(id + " shut down");
@@ -165,11 +165,10 @@ namespace ZooKeeperSample
 
 
         }
-        public void ZookeeperMutex() {
+        public void ZookeeperMutex()
+        {
             WatcherWithDelegate wwd = null;
-            wwd = new WatcherWithDelegate(p => {
-                
-            });
+
             zk = new ZooKeeper("127.0.0.1:2181", TimeSpan.FromMinutes(3), null);
             string line = "";
             ManualResetEvent mre = new ManualResetEvent(false);
@@ -184,6 +183,61 @@ namespace ZooKeeperSample
             });
             act.BeginInvoke(null, null);
             mre.WaitOne();
+            mre.Reset();
+            string id = Guid.NewGuid().ToString(); 
+            string id1 = zk.Create("/zookeeper/locks/mylock", Encoding.UTF8.GetBytes(id), Ids.OPEN_ACL_UNSAFE, CreateMode.EphemeralSequential);
+            Console.WriteLine(id1);
+            IEnumerable<string> childs = null;
+            try
+            {
+                childs = zk.GetChildren("/zookeeper/locks", false, null);
+            }
+            catch
+            {
+            }
+            string num = id1.TrimStart("/zookeeper/locks/mylock".ToCharArray());
+            long lid = long.Parse(num);
+            //if (lid == 0 || childs == null || childs.Count() == 0)
+            //{
+            //    Thread.Sleep(3000);
+            //    zk.Dispose();
+            //    Console.WriteLine(id + " release lock");
+            //}
+            //else
+            {
+                WatcherWithDelegate wwd2 = null;
+                wwd2 = new WatcherWithDelegate(p =>
+                  {
+                      Console.WriteLine(p.Type + " " + p.Path);
+                      if (p.Type == EventType.NodeDeleted)
+                      {
+                          Console.WriteLine("last delete");
+                          mre.Set();
+                      }
+                      else
+                      {
+                          zk.Exists("/zookeeper/locks/mylock" + string.Format("{0:D10}", lid - 1), wwd2);
+                      }
+                  });
+                var stat = zk.Exists("/zookeeper/locks/mylock" + string.Format("{0:D10}", lid - 1), wwd2);
+                Thread.Sleep(3000);
+                try
+                {
+                    childs = zk.GetChildren("/zookeeper/locks", false, null);
+                    var mmm = childs?.OrderBy(p => p).FirstOrDefault();
+                    if (mmm== id1)
+                    {
+                        zk.Dispose();
+                        return;
+                    } 
+                }
+                catch
+                {
+                }
+                mre.WaitOne();
+                zk.Dispose();
+                Console.WriteLine(id + " release lock");
+            }
         }
 
     }
