@@ -169,14 +169,13 @@ namespace ZooKeeperSample
         {
             WatcherWithDelegate wwd = null;
 
-            zk = new ZooKeeper("127.0.0.1:2181", TimeSpan.FromMinutes(3), null);
+            zk = new ZooKeeper("127.0.0.1:2181", TimeSpan.FromSeconds(60), null);
             string line = "";
             ManualResetEvent mre = new ManualResetEvent(false);
             Action act = (() =>
             {
                 while (zk.State != States.CONNECTED)
-                {
-                    Console.WriteLine("Loading");
+                { 
                     Thread.Sleep(300);
                 }
                 mre.Set();
@@ -184,61 +183,75 @@ namespace ZooKeeperSample
             act.BeginInvoke(null, null);
             mre.WaitOne();
             mre.Reset();
-            string id = Guid.NewGuid().ToString(); 
-            string id1 = zk.Create("/zookeeper/locks/mylock", Encoding.UTF8.GetBytes(id), Ids.OPEN_ACL_UNSAFE, CreateMode.EphemeralSequential);
-            Console.WriteLine(id1);
-            IEnumerable<string> childs = null;
-            try
+            string nodeData = Guid.NewGuid().ToString();
+            string myId = zk.Create("/zookeeper/locks/mylock", Encoding.UTF8.GetBytes(nodeData), Ids.OPEN_ACL_UNSAFE, CreateMode.EphemeralSequential); 
+            long lid = getSequcentialId(myId); 
+            Console.WriteLine(myId + " created ");
+            //获取zookeeper分配的序列号
+            //当前进程是第一个锁时 证明持有该互斥锁
+            if (lid == 0 )
             {
-                childs = zk.GetChildren("/zookeeper/locks", false, null);
+                //模拟处理程序
+                Thread.Sleep(10000);
+                //释放当前锁
+                zk.Dispose();
+                Console.WriteLine(myId + " release lock");
+                return;
             }
-            catch
-            {
-            }
-            string num = id1.TrimStart("/zookeeper/locks/mylock".ToCharArray());
-            long lid = long.Parse(num);
-            //if (lid == 0 || childs == null || childs.Count() == 0)
-            //{
-            //    Thread.Sleep(3000);
-            //    zk.Dispose();
-            //    Console.WriteLine(id + " release lock");
-            //}
-            //else
-            {
+            else
+            { 
+                IEnumerable<string> childs = null;
+                //获取上一个可能持锁进程节点
+                string littleId = "/zookeeper/locks/mylock" + string.Format("{0:D10}", lid - 1);
                 WatcherWithDelegate wwd2 = null;
+                
                 wwd2 = new WatcherWithDelegate(p =>
-                  {
-                      Console.WriteLine(p.Type + " " + p.Path);
-                      if (p.Type == EventType.NodeDeleted)
-                      {
-                          Console.WriteLine("last delete");
-                          mre.Set();
-                      }
-                      else
-                      {
-                          zk.Exists("/zookeeper/locks/mylock" + string.Format("{0:D10}", lid - 1), wwd2);
-                      }
-                  });
-                var stat = zk.Exists("/zookeeper/locks/mylock" + string.Format("{0:D10}", lid - 1), wwd2);
-                Thread.Sleep(3000);
+                {
+                    //之前持锁进程已经结束
+                    //本进程可以执行
+                    if (p.Type == EventType.NodeDeleted && p.Path == littleId)
+                    {
+                        Console.WriteLine(p.Path + " is deleted");
+                        Console.WriteLine(myId + " get lock ");
+                        mre.Set();
+                    }
+                    else//继续监听
+                    {
+                        zk.Exists(littleId, wwd2);
+                    }
+                });
+                //开始监听上一持锁对象
+                var stat = zk.Exists(littleId, wwd2);
                 try
                 {
                     childs = zk.GetChildren("/zookeeper/locks", false, null);
-                    var mmm = childs?.OrderBy(p => p).FirstOrDefault();
-                    if (mmm== id1)
+                    var mmm = "/zookeeper/locks/" + childs?.OrderBy(p => p).FirstOrDefault();
+                    if (string.Equals(mmm, myId))
                     {
                         zk.Dispose();
+                        Console.WriteLine("first dispose :{0}", myId);
                         return;
-                    } 
+                    }
                 }
                 catch
                 {
                 }
+
                 mre.WaitOne();
+                Console.WriteLine(myId + " doing something");
+                Thread.Sleep(10000);
+                Console.WriteLine(myId + " release lock");
                 zk.Dispose();
-                Console.WriteLine(id + " release lock");
+                Console.WriteLine(myId + " release lock2");
+
             }
         }
 
+        private static long getSequcentialId(string id1)
+        {
+            string num = id1.TrimStart("/zookeeper/locks/mylock".ToCharArray());
+            long lid = long.Parse(num);
+            return lid;
+        }
     }
 }

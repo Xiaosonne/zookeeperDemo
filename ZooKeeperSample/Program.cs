@@ -11,18 +11,19 @@ namespace ZooKeeperSample
     {
         static void Main(string[] args)
         {
-             
+            //ServiceTest st = new ServiceTest();
+            //st.ZookeeperMutex();
             int i = 0;
             while (i < 5)
             {
                 Action act = new Action(() =>
-                { 
+                {
                     ServiceTest st = new ServiceTest();
                     st.ZookeeperMutex();
                 });
                 i++;
                 act.BeginInvoke(null, null);
-            } 
+            }
             while (Console.ReadLine() != "QUIT")
             {
                 continue;
